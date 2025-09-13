@@ -1,5 +1,3 @@
----
-
 # 🛒 Product Analysis Tool
 
 **Product Analysis Tool** is a Flask-based web application that allows users to search products across **Amazon, Flipkart, and Myntra**, analyze product details and pricing, store data in a **SQLite database**, and visualize insights with interactive plots.
