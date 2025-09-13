@@ -1,10 +1,10 @@
-# scraper.py (fix Myntra & Flipkart selectors)
+# scraper.py (fixed for Render with headless Chromium)
 import time, sqlite3, pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 
 DB_NAME = "ecommerce.db"
 TABLE_NAME = "products"
@@ -15,7 +15,18 @@ def _init_driver(headless=True):
         options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920,1080")
+    
+    # Use Chromium binary on Render
+    options.binary_location = "/usr/bin/chromium-browser"
+    
+    # Initialize Chrome driver
+    driver = webdriver.Chrome(
+        service=Service(ChromeDriverManager().install()),
+        options=options
+    )
+    return driver
 
 # ---------- Amazon ----------
 def scrape_amazon(query, max_pages=1, headless=True):
@@ -26,16 +37,14 @@ def scrape_amazon(query, max_pages=1, headless=True):
     for page in range(max_pages):
         items = driver.find_elements(By.XPATH, "//div[@data-component-type='s-search-result']")
         for item in items:
-            try:
-                title = item.find_element(By.TAG_NAME, "h2").text.strip()
+            try: title = item.find_element(By.TAG_NAME, "h2").text.strip()
             except: continue
-            try:
-                price = item.find_element(By.CSS_SELECTOR, ".a-price-whole").text
+            try: price = item.find_element(By.CSS_SELECTOR, ".a-price-whole").text
             except: price = "N/A"
-            try:
-                rating = item.find_element(By.CSS_SELECTOR, ".a-icon-alt").get_attribute("innerHTML")
+            try: rating = item.find_element(By.CSS_SELECTOR, ".a-icon-alt").get_attribute("innerHTML")
             except: rating = "N/A"
-            link = item.find_element(By.TAG_NAME, "a").get_attribute("href")
+            try: link = item.find_element(By.TAG_NAME, "a").get_attribute("href")
+            except: link = ""
             products.append({"Source":"Amazon","Title":title,"Price":price,"Rating":rating,"Link":link})
         try:
             driver.find_element(By.CSS_SELECTOR, "a.s-pagination-next").click()
@@ -58,10 +67,10 @@ def scrape_myntra(query, max_pages=1, headless=True):
                 name = item.find_element(By.CSS_SELECTOR, ".product-product").text
                 title = f"{brand} {name}"
             except: continue
-            try:
-                price = item.find_element(By.CSS_SELECTOR, ".product-price").text
+            try: price = item.find_element(By.CSS_SELECTOR, ".product-price").text
             except: price = "N/A"
-            link = item.find_element(By.TAG_NAME,"a").get_attribute("href")
+            try: link = item.find_element(By.TAG_NAME,"a").get_attribute("href")
+            except: link = ""
             products.append({"Source":"Myntra","Title":title,"Price":price,"Rating":"N/A","Link":link})
         try:
             driver.find_element(By.CSS_SELECTOR,"li.pagination-next a").click()
@@ -77,12 +86,17 @@ def scrape_flipkart(query, max_pages=1, headless=True):
     time.sleep(2)
     products = []
     for page in range(max_pages):
-        titles = driver.find_elements(By.CSS_SELECTOR,".IRpwTa, ._4rR01T")  # product titles
-        prices = driver.find_elements(By.CSS_SELECTOR,"._30jeq3")           # prices
+        titles = driver.find_elements(By.CSS_SELECTOR,".IRpwTa, ._4rR01T")
+        prices = driver.find_elements(By.CSS_SELECTOR,"._30jeq3")
         links = driver.find_elements(By.CSS_SELECTOR,"a._1fQZEK, a.IRpwTa")
         for i in range(min(len(titles),len(prices),len(links))):
-            products.append({"Source":"Flipkart","Title":titles[i].text,"Price":prices[i].text,
-                             "Rating":"N/A","Link":links[i].get_attribute("href")})
+            products.append({
+                "Source":"Flipkart",
+                "Title":titles[i].text,
+                "Price":prices[i].text,
+                "Rating":"N/A",
+                "Link":links[i].get_attribute("href")
+            })
         try:
             driver.find_element(By.CSS_SELECTOR,"a._1LKTO3").click()
             time.sleep(2)
@@ -93,20 +107,20 @@ def scrape_flipkart(query, max_pages=1, headless=True):
 # ---------- DB Save & Clean ----------
 def save_raw_to_db(df, reset=False):
     if df is None or df.empty: return
-    conn=sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(DB_NAME)
     if reset: conn.execute(f"DROP TABLE IF EXISTS {TABLE_NAME}")
     df.to_sql(TABLE_NAME, conn, if_exists="append", index=False)
     conn.close()
 
 def clean_and_update_db():
-    conn=sqlite3.connect(DB_NAME)
-    try: df=pd.read_sql(f"SELECT * FROM {TABLE_NAME}", conn)
+    conn = sqlite3.connect(DB_NAME)
+    try: df = pd.read_sql(f"SELECT * FROM {TABLE_NAME}", conn)
     except: conn.close(); return
     if df.empty: conn.close(); return
-    df["Price"]=df["Price"].astype(str).str.replace("₹","").str.replace(",","").str.extract(r"(\d+)")
-    df["Price"]=pd.to_numeric(df["Price"],errors="coerce")
-    df["Rating"]=pd.to_numeric(df["Rating"].astype(str).str.extract(r"(\d+\.\d+)")[0],errors="coerce")
-    df=df.dropna(subset=["Price"]); df["Price"]=df["Price"].astype(float)
+    df["Price"] = df["Price"].astype(str).str.replace("₹","").str.replace(",","").str.extract(r"(\d+)")[0]
+    df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
+    df["Rating"] = pd.to_numeric(df["Rating"].astype(str).str.extract(r"(\d+\.\d+)")[0], errors="coerce")
+    df = df.dropna(subset=["Price"]); df["Price"] = df["Price"].astype(float)
     conn.execute(f"DROP TABLE IF EXISTS {TABLE_NAME}")
     df.to_sql(TABLE_NAME, conn, if_exists="append", index=False)
     conn.close()
