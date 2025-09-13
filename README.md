@@ -86,17 +86,19 @@ App will be live at → `http://127.0.0.1:5000`
 ### 🔎 Home Page
 
 Users can search and select platforms (Amazon, Myntra, Flipkart)
-![Home Page](https://via.placeholder.com/900x400?text=Home+Page+Screenshot)
+![Home Page](https://github.com/pranayguptag/product-analysis-tool/blob/main/Media/Home.png)
 
 ### 📋 Product Results
 
 Clean tabular view of products scraped from platforms
-![Products](https://via.placeholder.com/900x400?text=Products+Page+Screenshot)
+![Products](https://github.com/pranayguptag/product-analysis-tool/blob/main/Media/Products1.png)
+![Products](https://github.com/pranayguptag/product-analysis-tool/blob/main/Media/Products2.png)
 
 ### 📊 Visual Analysis
 
 Compare product prices and insights visually
-![Visuals](https://via.placeholder.com/900x400?text=Visuals+Page+Screenshot)
+![Visuals](https://github.com/pranayguptag/product-analysis-tool/blob/main/Media/Visuals1.png)
+![Visuals](https://github.com/pranayguptag/product-analysis-tool/blob/main/Media/Visuals2.png)
 
 ---
 
