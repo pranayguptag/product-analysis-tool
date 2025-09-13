@@ -40,8 +40,15 @@
 
     <!-- Search Box -->
     <form method="POST" onsubmit="showLoadingMessage()" class="bg-white shadow-xl p-6 rounded-lg max-w-2xl mx-auto">
-      <input id="query" name="query" placeholder="Search products..." required
+      <input id="query" name="query" placeholder="Search any products..." required
         class="w-full border p-3 rounded mb-4 focus:ring-2 focus:ring-blue-400" />
+
+        <!-- Recommendation Search Label -->
+        <div class="text-center mb-2">
+          <span class="font-bold text-xl bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent drop-shadow">
+            Recommendation search
+          </span>
+        </div>
 
       <!-- Recommended Buttons -->
       <div class="flex flex-wrap gap-2 mb-6 justify-center">
@@ -52,6 +59,9 @@
           </button>
         {% endfor %}
       </div>
+
+        <!-- Checkbox Instruction -->
+        <div class="text-center text-blue-700 font-semibold mb-2">Choose one or more checkboxes below:</div>
 
       <!-- Checkboxes -->
       <div class="flex gap-6 justify-center mb-6">
