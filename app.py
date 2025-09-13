@@ -104,8 +104,16 @@ def visuals():
 
     # Boxplot
     fig, ax = plt.subplots(figsize=(8,5))
-    sns.boxplot(x="Source", y="Price", data=df, ax=ax, palette={"Amazon":"#FF9900","Myntra":"#E91E63"})
-    ax.set_title("Price Comparison (Amazon vs Myntra)")
+    sns.boxplot(
+        x="Source",
+        y="Price",
+        hue="Source",
+        data=df,
+        ax=ax,
+        palette={"Amazon":"#FF9900", "Myntra":"#E91E63", "Flipkart":"#2874F0"},
+        legend=False
+    )
+    ax.set_title("Price Comparison by Source")
     plots["boxplot"] = fig_to_base64(fig)
 
     # Avg price
