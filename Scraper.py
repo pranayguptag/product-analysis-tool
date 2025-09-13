@@ -1,136 +1,151 @@
-# scraper.py (fixed for Render with headless Chromium)
-import time, sqlite3, pandas as pd
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
+# scraper_playwright.py
+import sqlite3
+import pandas as pd
+from playwright.sync_api import sync_playwright
 
 DB_NAME = "ecommerce.db"
 TABLE_NAME = "products"
 
-def _init_driver(headless=True):
-    options = Options()
-    if headless:
-        options.add_argument("--headless=new")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1920,1080")
-    
-    # Use Chromium binary on Render
-    options.binary_location = "/usr/bin/chromium-browser"
-    
-    # Initialize Chrome driver
-    driver = webdriver.Chrome(
-        service=Service(ChromeDriverManager().install()),
-        options=options
-    )
-    return driver
-
-# ---------- Amazon ----------
-def scrape_amazon(query, max_pages=1, headless=True):
-    driver = _init_driver(headless)
-    driver.get(f"https://www.amazon.in/s?k={query.replace(' ', '+')}")
-    time.sleep(2)
-    products = []
-    for page in range(max_pages):
-        items = driver.find_elements(By.XPATH, "//div[@data-component-type='s-search-result']")
-        for item in items:
-            try: title = item.find_element(By.TAG_NAME, "h2").text.strip()
-            except: continue
-            try: price = item.find_element(By.CSS_SELECTOR, ".a-price-whole").text
-            except: price = "N/A"
-            try: rating = item.find_element(By.CSS_SELECTOR, ".a-icon-alt").get_attribute("innerHTML")
-            except: rating = "N/A"
-            try: link = item.find_element(By.TAG_NAME, "a").get_attribute("href")
-            except: link = ""
-            products.append({"Source":"Amazon","Title":title,"Price":price,"Rating":rating,"Link":link})
-        try:
-            driver.find_element(By.CSS_SELECTOR, "a.s-pagination-next").click()
-            time.sleep(2)
-        except: break
-    driver.quit()
-    return pd.DataFrame(products)
-
-# ---------- Myntra ----------
-def scrape_myntra(query, max_pages=1, headless=True):
-    driver = _init_driver(headless)
-    driver.get(f"https://www.myntra.com/{query.replace(' ', '-')}")
-    time.sleep(2)
-    products = []
-    for page in range(max_pages):
-        items = driver.find_elements(By.CSS_SELECTOR, ".product-base")
-        for item in items:
-            try:
-                brand = item.find_element(By.CSS_SELECTOR, ".product-brand").text
-                name = item.find_element(By.CSS_SELECTOR, ".product-product").text
-                title = f"{brand} {name}"
-            except: continue
-            try: price = item.find_element(By.CSS_SELECTOR, ".product-price").text
-            except: price = "N/A"
-            try: link = item.find_element(By.TAG_NAME,"a").get_attribute("href")
-            except: link = ""
-            products.append({"Source":"Myntra","Title":title,"Price":price,"Rating":"N/A","Link":link})
-        try:
-            driver.find_element(By.CSS_SELECTOR,"li.pagination-next a").click()
-            time.sleep(2)
-        except: break
-    driver.quit()
-    return pd.DataFrame(products)
-
-# ---------- Flipkart ----------
-def scrape_flipkart(query, max_pages=1, headless=True):
-    driver = _init_driver(headless)
-    driver.get(f"https://www.flipkart.com/search?q={query.replace(' ', '+')}")
-    time.sleep(2)
-    products = []
-    for page in range(max_pages):
-        titles = driver.find_elements(By.CSS_SELECTOR,".IRpwTa, ._4rR01T")
-        prices = driver.find_elements(By.CSS_SELECTOR,"._30jeq3")
-        links = driver.find_elements(By.CSS_SELECTOR,"a._1fQZEK, a.IRpwTa")
-        for i in range(min(len(titles),len(prices),len(links))):
-            products.append({
-                "Source":"Flipkart",
-                "Title":titles[i].text,
-                "Price":prices[i].text,
-                "Rating":"N/A",
-                "Link":links[i].get_attribute("href")
-            })
-        try:
-            driver.find_element(By.CSS_SELECTOR,"a._1LKTO3").click()
-            time.sleep(2)
-        except: break
-    driver.quit()
-    return pd.DataFrame(products)
-
 # ---------- DB Save & Clean ----------
 def save_raw_to_db(df, reset=False):
-    if df is None or df.empty: return
+    if df is None or df.empty:
+        return
     conn = sqlite3.connect(DB_NAME)
-    if reset: conn.execute(f"DROP TABLE IF EXISTS {TABLE_NAME}")
+    if reset:
+        conn.execute(f"DROP TABLE IF EXISTS {TABLE_NAME}")
     df.to_sql(TABLE_NAME, conn, if_exists="append", index=False)
     conn.close()
 
 def clean_and_update_db():
     conn = sqlite3.connect(DB_NAME)
-    try: df = pd.read_sql(f"SELECT * FROM {TABLE_NAME}", conn)
-    except: conn.close(); return
-    if df.empty: conn.close(); return
-    df["Price"] = df["Price"].astype(str).str.replace("₹","").str.replace(",","").str.extract(r"(\d+)")[0]
+    try:
+        df = pd.read_sql(f"SELECT * FROM {TABLE_NAME}", conn)
+    except:
+        conn.close()
+        return
+    if df.empty:
+        conn.close()
+        return
+    # Clean price & rating
+    df["Price"] = df["Price"].astype(str).str.replace("₹", "").str.replace(",", "").str.extract(r"(\d+)")[0]
     df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
     df["Rating"] = pd.to_numeric(df["Rating"].astype(str).str.extract(r"(\d+\.\d+)")[0], errors="coerce")
-    df = df.dropna(subset=["Price"]); df["Price"] = df["Price"].astype(float)
+    df = df.dropna(subset=["Price"])
+    df["Price"] = df["Price"].astype(float)
     conn.execute(f"DROP TABLE IF EXISTS {TABLE_NAME}")
     df.to_sql(TABLE_NAME, conn, if_exists="append", index=False)
     conn.close()
 
-def run_scrapers_and_update_db(query,use_amazon=False,use_myntra=False,use_flipkart=False,max_pages=1,headless=True):
-    reset=True
+
+# ---------- Amazon ----------
+def scrape_amazon(query, max_pages=1):
+    products = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(f"https://www.amazon.in/s?k={query.replace(' ','+')}")
+        for _ in range(max_pages):
+            items = page.query_selector_all("div[data-component-type='s-search-result']")
+            for item in items:
+                try:
+                    title = item.query_selector("h2").inner_text()
+                except: continue
+                try:
+                    price = item.query_selector(".a-price-whole").inner_text()
+                except: price = "N/A"
+                try:
+                    rating = item.query_selector(".a-icon-alt").inner_text()
+                except: rating = "N/A"
+                try:
+                    link = item.query_selector("a").get_attribute("href")
+                except: link = ""
+                products.append({"Source":"Amazon","Title":title,"Price":price,"Rating":rating,"Link":link})
+            try:
+                next_btn = page.query_selector("a.s-pagination-next")
+                if next_btn:
+                    next_btn.click()
+                    page.wait_for_timeout(2000)
+                else:
+                    break
+            except:
+                break
+        browser.close()
+    return pd.DataFrame(products)
+
+
+# ---------- Myntra ----------
+def scrape_myntra(query, max_pages=1):
+    products = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(f"https://www.myntra.com/{query.replace(' ','-')}")
+        for _ in range(max_pages):
+            items = page.query_selector_all(".product-base")
+            for item in items:
+                try:
+                    brand = item.query_selector(".product-brand").inner_text()
+                    name = item.query_selector(".product-product").inner_text()
+                    title = f"{brand} {name}"
+                except: continue
+                try:
+                    price = item.query_selector(".product-price").inner_text()
+                except: price = "N/A"
+                try:
+                    link = item.query_selector("a").get_attribute("href")
+                except: link = ""
+                products.append({"Source":"Myntra","Title":title,"Price":price,"Rating":"N/A","Link":link})
+            try:
+                next_btn = page.query_selector("li.pagination-next a")
+                if next_btn:
+                    next_btn.click()
+                    page.wait_for_timeout(2000)
+                else:
+                    break
+            except:
+                break
+        browser.close()
+    return pd.DataFrame(products)
+
+
+# ---------- Flipkart ----------
+def scrape_flipkart(query, max_pages=1):
+    products = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+        page.goto(f"https://www.flipkart.com/search?q={query.replace(' ','+')}")
+        for _ in range(max_pages):
+            titles = page.query_selector_all(".IRpwTa, ._4rR01T")
+            prices = page.query_selector_all("._30jeq3")
+            links = page.query_selector_all("a._1fQZEK, a.IRpwTa")
+            for i in range(min(len(titles), len(prices), len(links))):
+                products.append({"Source":"Flipkart","Title":titles[i].inner_text(),
+                                 "Price":prices[i].inner_text(),"Rating":"N/A",
+                                 "Link":links[i].get_attribute("href")})
+            try:
+                next_btn = page.query_selector("a._1LKTO3")
+                if next_btn:
+                    next_btn.click()
+                    page.wait_for_timeout(2000)
+                else:
+                    break
+            except:
+                break
+        browser.close()
+    return pd.DataFrame(products)
+
+
+# ---------- Run Scrapers ----------
+def run_scrapers_and_update_db(query, use_amazon=False, use_myntra=False, use_flipkart=False, max_pages=1):
+    reset = True
     if use_amazon:
-        save_raw_to_db(scrape_amazon(query,max_pages,headless),reset=reset); reset=False
+        save_raw_to_db(scrape_amazon(query, max_pages), reset=reset)
+        reset = False
     if use_myntra:
-        save_raw_to_db(scrape_myntra(query,max_pages,headless),reset=reset); reset=False
+        save_raw_to_db(scrape_myntra(query, max_pages), reset=reset)
+        reset = False
     if use_flipkart:
-        save_raw_to_db(scrape_flipkart(query,max_pages,headless),reset=reset); reset=False
+        save_raw_to_db(scrape_flipkart(query, max_pages), reset=reset)
+        reset = False
     clean_and_update_db()

@@ -5,10 +5,9 @@ import sqlite3
 import io, base64
 import matplotlib.pyplot as plt
 import seaborn as sns
-
-from Scraper import run_scrapers_and_update_db, DB_NAME, TABLE_NAME
 import os
-from flask import send_file
+
+from Scraper import run_scrapers_and_update_db, DB_NAME, TABLE_NAME  # updated import
 
 app = Flask(__name__)
 
@@ -37,13 +36,10 @@ def fig_to_base64(fig):
 def home():
     if request.method == "POST":
         query = request.form.get("query", "").strip()
-        use_amazon = request.form.get("amazon")=="on"
-        use_myntra = request.form.get("myntra")=="on"
-        use_flipkart = request.form.get("flipkart")=="on"
-        # optional number of pages (keep small)
+        use_amazon = request.form.get("amazon") == "on"
+        use_myntra = request.form.get("myntra") == "on"
+        use_flipkart = request.form.get("flipkart") == "on"
         pages = int(request.form.get("pages", 1))
-        # headless option toggle (helpful for debugging)
-        headless = True if request.form.get("headless") == "on" else False
 
         if not query:
             return render_template("home.html", message="Please enter a product to search.", example="shoes")
@@ -51,12 +47,11 @@ def home():
         if use_flipkart and not (use_amazon or use_myntra):
             return render_template("home.html", message="⚠ Flipkart requires Amazon or Myntra for comparison.", example="shoes")
 
-        # Run scrapers synchronously (blocking) — this saves & cleans DB
-        run_scrapers_and_update_db(query, use_amazon, use_myntra, use_flipkart, max_pages=pages, headless=headless)
+        # Run scrapers (Playwright handles headless internally)
+        run_scrapers_and_update_db(query, use_amazon, use_myntra, use_flipkart, max_pages=pages)
 
         return redirect(url_for("products"))
 
-    # GET request - render form
     return render_template("home.html", message=None, example="shoes")
 
 
@@ -66,7 +61,6 @@ def products():
     df = pd.read_sql(f"SELECT * FROM {TABLE_NAME}", conn)
     conn.close()
 
-    # Ensure numeric
     df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
     df = df.dropna(subset=["Price"])
 
@@ -85,11 +79,9 @@ def download_csv():
     df = pd.read_sql(f"SELECT * FROM {TABLE_NAME}", conn)
     conn.close()
 
-    # Ensure numeric for price
     df["Price"] = pd.to_numeric(df["Price"], errors="coerce")
     df = df.dropna(subset=["Price"])
 
-    # Save CSV in project directory (safe)
     file_path = os.path.join(os.getcwd(), "scraped_data.csv")
     df.to_csv(file_path, index=False, encoding="utf-8-sig")
 
