@@ -104,7 +104,7 @@ Compare product prices and insights visually
 
 ## 🎥 Demo Video
 
-📹 [Click here to watch demo](https://github.com/pranayguptag/product-analysis-tool/demo.mp4)
+📹 [Click here to watch demo](https://github.com/user-attachments/assets/51d7e9f3-d738-49e5-a193-62897620c62a)
 
 ---
 
