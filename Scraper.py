@@ -3,11 +3,13 @@ import time, sqlite3, pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
 
 DB_NAME = "ecommerce.db"
 TABLE_NAME = "products"
+
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
 
 def _init_driver(headless=True):
     options = Options()
@@ -15,7 +17,14 @@ def _init_driver(headless=True):
         options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
-    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    options.add_argument("--disable-gpu")
+    options.add_argument("--window-size=1920x1080")
+
+    return webdriver.Chrome(options=options)
+
+
+
+
 
 # ---------- Amazon ----------
 def scrape_amazon(query, max_pages=1, headless=True):

@@ -1,25 +1,16 @@
-# Use official Python image
-FROM python:3.11-slim
+# Use Selenium base image with Chrome + driver pre-installed
+FROM selenium/standalone-chrome:118.0
 
-# Prevent Python from writing .pyc files
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Install system dependencies (Chrome + driver + fonts)
-RUN apt-get update && apt-get install -y \
-    wget unzip curl gnupg \
-    chromium chromium-driver \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set display for headless
-ENV DISPLAY=:99
+# Install Python
+USER root
+RUN apt-get update && apt-get install -y python3 python3-pip && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Install Python dependencies
+# Install dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Copy project files
 COPY . .
@@ -27,5 +18,5 @@ COPY . .
 # Expose port
 EXPOSE 8080
 
-# Run Flask app with Gunicorn
+# Start with gunicorn
 CMD ["gunicorn", "-b", "0.0.0.0:8080", "app:app"]
