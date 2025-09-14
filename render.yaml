@@ -1,11 +1,7 @@
 services:
   - type: web
     name: product-analysis-tool
-    env: python
-    pythonVersion: "3.11"
+    env: docker
     plan: free
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app"
-    buildpacks:
-      - url: https://github.com/heroku/heroku-buildpack-google-chrome
-      - url: https://github.com/heroku/heroku-buildpack-chromedriver
+    # Health check to ensure the service is running
+    healthCheckPath: /
