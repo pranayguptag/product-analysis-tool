@@ -41,7 +41,7 @@ product-analysis-tool/
 * **Backend:** Flask (Python)
 * **Database:** SQLite
 * **Frontend:** HTML, TailwindCSS
-* **Scraping:** BeautifulSoup, Requests
+* **Scraping:** Selenium, Webdriver_manager
 * **Visualization:** Matplotlib, Pandas
 
 ---
