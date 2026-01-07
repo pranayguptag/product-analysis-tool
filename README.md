@@ -113,7 +113,7 @@ https://github.com/user-attachments/assets/51d7e9f3-d738-49e5-a193-62897620c62a
 **Pranay Gupta**
 
 * 🎓 B.Tech Student @ NIET, Greater Noida
-* 🌐 [LinkedI](https://www.linkedin.com/in/pranay05gupta/)
+* 🌐 [LinkedIn](https://www.linkedin.com/in/pranay05gupta/)
 * 💻 [GitHub](https://github.com/pranayguptag)
 
 ---
